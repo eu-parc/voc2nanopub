@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  # pull_request:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -16,6 +16,7 @@ jobs:
       data: data/example.yml
       target_name: matrices
       server_mode: test
+      parent_key: parent_matrix
       dry_run: true  # Set to true for testing to avoid actual publishing
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
