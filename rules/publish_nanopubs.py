@@ -246,6 +246,14 @@ def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
     help="Name of the field that references parent entities (for topological sorting)",
     default=None,
 )
+@click.option(
+    "--output",
+    "output_path",
+    required=False,
+    type=click.Path(),
+    help="Path to output YAML data file",
+    default=None,
+)
 def main(
     schema_path: str,
     data_path: str,
@@ -259,6 +267,7 @@ def main(
     test_server: bool = True,
     dry_run: bool = False,
     verbose: bool = False,
+    output: str = None,
 ):
     """
     Create and publish nanopublications from structured data.
@@ -351,7 +360,9 @@ def main(
             f"Published: {published}, Skipped: {skipped}"
         )
 
-        return yaml_dump(yaml_root, target_name, entities, data_path)
+        if output is None:
+            output = data_path
+        return yaml_dump(yaml_root, target_name, entities, output)
 
     except Exception as e:
         logger.error(f"Error in nanopub processing: {e}")

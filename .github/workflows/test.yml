@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - main
-  # pull_request:
+  pull_request:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
   test-workflow-nanopub-publish:
-    uses: ./.github/workflows/nanopub-publish.yml
+    uses: ./.github/workflows/yml2nanopub.yml
     with:
       ref: ${{ github.ref }}
       linkml_schema: schema/example.linkml.yml
@@ -18,6 +18,7 @@ jobs:
       server_mode: test
       parent_key: parent_matrix
       dry_run: true  # Set to true for testing to avoid actual publishing
+      output: data/example-output.yml
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
       NANOPUB_ORCID_ID: ${{ secrets.NANOPUB_ORCID_ID }}
@@ -25,4 +26,3 @@ jobs:
       NANOPUB_PRIVATE_KEY: ${{ secrets.NANOPUB_PRIVATE_KEY }}
       NANOPUB_PUBLIC_KEY: ${{ secrets.NANOPUB_PUBLIC_KEY }}
       NANOPUB_INTRO_URI: ${{ secrets.NANOPUB_INTRO_URI }}
-

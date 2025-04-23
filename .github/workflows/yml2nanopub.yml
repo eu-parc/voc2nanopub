@@ -36,6 +36,10 @@ on:
         description: 'Parent key to be provided for topological sort'
         type: string
         required: false
+      output:
+        description: 'output path for modified yaml file'
+        type: string
+        required: false
       
     secrets:
       token:
@@ -136,6 +140,7 @@ jobs:
             --data "${{ inputs.data }}" \
             --parent-key "${{ inputs.parent_key }}" \ 
             --target "${{ inputs.target_name }}" \
+            --output "${{ inputs.output }}" \
             ${{ steps.set-server-flag.outputs.SERVER_FLAG }} \
             ${{ steps.set-dry-run.outputs.DRY_RUN_FLAG }} \
             --verbose
