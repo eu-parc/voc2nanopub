@@ -1,0 +1,429 @@
+matrices:
+- id: http://purl.org/np/RADQ_q44_tT-9qy3LEF7COJ0KrEDhUNvpG_xaYOexjroE
+  aggregation_target: false
+  name: All toe nail
+  parent_matrix: peh:n
+  sort_order: 17
+  unique_name: atn
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: alle teennagels
+- id: http://purl.org/np/RASLODhRd-PxN3QSLF60BVQaZ5nygUHCAbpHMJf_0Sasc
+  aggregation_target: false
+  name: water
+  sort_order: 37
+  unique_name: water
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: water
+- id: http://purl.org/np/RAQa8VGPnG-pYAc5aQ7xr0MbRbZGbcTf0f12tlMBq3v9o
+  aggregation_target: false
+  name: outdoor air-stationary
+  parent_matrix: peh:air
+  sort_order: 31
+  unique_name: oair
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: buitenlucht
+- id: http://purl.org/np/RATtlDMtagS-cheW_FvxNx1raCvM12KH_rdCrtMVZEz4s
+  aggregation_target: false
+  name: cord blood-serum
+  parent_matrix: peh:cordBlood
+  sort_order: 7
+  unique_name: cbs
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: navelstrengbloed-serum
+- id: http://purl.org/np/RAMTiU_aspYSUd-Dd2xX5nkk68Hp5UJfqt9ulaOq96I48
+  aggregation_target: false
+  name: exhaled breath condensate
+  sort_order: 23
+  unique_name: ebc
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: uitgeademde lucht condensaat
+- id: http://purl.org/np/RAzKfLCyl3lacCcMWDwAIZKKn2XHCx-7Njuq3b9qz-4Lw
+  aggregation_target: false
+  name: semen
+  sort_order: 22
+  unique_name: sem
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: zaad
+- id: http://purl.org/np/RACPEbvmSbzYkgZd0ZRx-0B1wiMFZumwwWT4PmQWK_L7U
+  aggregation_target: false
+  name: random spot urine
+  parent_matrix: peh:urine
+  sort_order: 10
+  unique_name: us
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: random spot-urine
+- id: http://purl.org/np/RAFnvEgy1-04FuMva2CA7d8bKDUBQTEzj0_PKnpqP7O4Y
+  aggregation_target: false
+  name: blood - red blood cells
+  parent_matrix: peh:bloodcells
+  sort_order: 5
+  unique_name: rbc
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed-rode bloedcellen
+- id: http://purl.org/np/RAxknYgSwHvxZai9gPeU9EdbbF42hJ1rpP8q_s_5-syGU
+  aggregation_target: false
+  name: volumetric absorptive microsample (VAMS)
+  parent_matrix: peh:blood
+  sort_order: 38
+  unique_name: vams
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: blood volumetrische absorptieve microsample
+- id: http://purl.org/np/RAu27ba04lZKJ_UuHZnqEe84Y-WYPf1Iu6868-pdbmb1g
+  aggregation_target: false
+  name: umbilical cord tissue
+  sort_order: 24
+  unique_name: cbt
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: weefsel van navelstreng
+- id: http://purl.org/np/RAD3t2MNOe867qmxjaelZFWakFYX9uwTqRy0ZtiRksiQY
+  aggregation_target: false
+  name: eggs
+  parent_matrix: peh:food
+  sort_order: 36
+  unique_name: egg
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: kippenei
+- id: http://purl.org/np/RAtp8eof9EkJj0wdJ1bo-zPhPFBcCZxUw7CzoX5yvaB0A
+  aggregation_target: false
+  name: saliva/sputum
+  sort_order: 20
+  unique_name: sa
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: speeksel
+- id: http://purl.org/np/RAfmUwJ8iPjQKNup7oUzI3K_ZyMLVcedEoiK67GHXi78E
+  aggregation_target: false
+  name: dermal wipes
+  sort_order: 26
+  unique_name: dw
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: dermale doekjes
+- id: http://purl.org/np/RAIB86gwDGUlynSygTWRyaCSAynGiE1WRLiVNwIKoYj4E
+  aggregation_target: false
+  name: adipose tissue/fat
+  sort_order: 25
+  unique_name: adi
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: vetweefsel/vet
+- id: http://purl.org/np/RA1VyvXulRDNMPL6LyWStzv8HLeX-ATq2Dnai7RKJ0XZs
+  aggregation_target: false
+  name: fasting urine
+  parent_matrix: peh:urine
+  sort_order: 12
+  unique_name: uf
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: urine nuchter
+- id: http://purl.org/np/RAwmJvLskFsKmPqjCG6Tj-BkUyzNsOStazUm7hxkYTuMc
+  aggregation_target: false
+  name: stool
+  sort_order: 21
+  unique_name: st
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: stoelgang
+- id: http://purl.org/np/RAodmKr8WVPxxzekNQzdZ-Wawzp4KA3VcYzFQiBj9knK0
+  aggregation_target: false
+  name: cord blood-whole blood
+  parent_matrix: peh:cordBlood
+  sort_order: 6
+  unique_name: cbwb
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: navelstrengbloed-volbloed
+- id: http://purl.org/np/RAwFc9Ck7hHjpjM3SwUV_B_byENv5K_t4Yb5SLFSKEsuE
+  aggregation_target: false
+  name: blood-blood cells
+  parent_matrix: peh:bloodcells
+  sort_order: 4
+  unique_name: bbc
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed-bloedcellen
+- id: http://purl.org/np/RAyck9ahrNtNGXiuDdU6_06PZ5u9r042TiviSP-WQ69BE
+  aggregation_target: false
+  name: breast milk
+  sort_order: 14
+  unique_name: bm
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: moedermelk
+- id: http://purl.org/np/RA3nURbi-SW0tt48HXozTjaoM2zv0rzDSJmNewYG6kU6w
+  aggregation_target: false
+  name: nail
+  sort_order: 16
+  unique_name: n
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: nagel
+- id: http://purl.org/np/RAuM4eAinak1LfEWI5ias1WrgrdkkPyjQvtIgrXE4UmrU
+  aggregation_target: false
+  name: blood plasma
+  parent_matrix: peh:blood
+  sort_order: 3
+  unique_name: bp
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed-plasma
+- id: http://purl.org/np/RAQwoFAVRCh4RKMazygvmle-jcI2_zmGIpW0SBjffjnhE
+  aggregation_target: false
+  name: cord blood-cells
+  sort_order: 9
+  unique_name: cbbc
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: navelstrengbloed-bloed cellen
+- id: http://purl.org/np/RACf6SoicGpCC9eUoKEzyQkIgGhy8bMZXuSke72luKiso
+  aggregation_target: false
+  name: outdoor dust
+  parent_matrix: peh:air
+  sort_order: 30
+  unique_name: odust
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: outdoor stof
+- id: http://purl.org/np/RAfkrmVsopHMc8pgEP3JYW04moOnEFYeWSHQAKUvj5WlA
+  aggregation_target: false
+  name: Big toe nail
+  parent_matrix: peh:n
+  sort_order: 18
+  unique_name: btn
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: grote teen nagel
+- id: http://purl.org/np/RAHVn9FomLWTk82NkBPWDjMHHtyRyV4GgEk1PJ0DZ6tbs
+  aggregation_target: false
+  name: nasal mucus
+  sort_order: 19
+  unique_name: nm
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: neusslijm
+- id: http://purl.org/np/RAogNynBhNcd-pgLaqguxckISddxyqD9luypNubRayHUQ
+  aggregation_target: false
+  name: placenta tissue
+  sort_order: 28
+  unique_name: plt
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: placenta weefsel
+- id: http://purl.org/np/RAcU_6PAw6cdmaQZyVcM4wD6cMSwtGOZJREpG4-Swsw-g
+  aggregation_target: false
+  name: kitchengarden food
+  parent_matrix: peh:food
+  sort_order: 35
+  unique_name: kgfood
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: moestuin voedsel
+- id: http://purl.org/np/RArEHkeAgw_fla3U5fSRidM1GGzMhS_nvETT-G2hptz9g
+  aggregation_target: false
+  name: soil
+  sort_order: 34
+  unique_name: soil
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: grond
+- id: http://purl.org/np/RAZp_OPhDOsVUbh0n9h3mxY8ZwIlJ5M45AELeEn4akKRk
+  aggregation_target: false
+  name: blood serum
+  parent_matrix: peh:blood
+  sort_order: 2
+  unique_name: bs
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed-serum
+- id: http://purl.org/np/RA9_ojU3VwM6-X6JkqcDnmWiJX_2a2LMYEzx-KIrsYX4g
+  aggregation_target: false
+  name: cord blood-plasma
+  parent_matrix: peh:cordBlood
+  sort_order: 8
+  unique_name: cbp
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: navelstrengbloed-plasma
+- id: http://purl.org/np/RAJ97bwhToZwAmw2rFAF9dIXsF7DRN0nu7cjUuaKDcpVk
+  aggregation_target: false
+  name: hair
+  sort_order: 15
+  unique_name: h
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: haar
+- id: http://purl.org/np/RAbHgEv2xdioA9OgKnfndOGblYxd4D6jhmZsSKkVz_ZCs
+  aggregation_target: false
+  name: dried blood spots
+  parent_matrix: peh:blood
+  sort_order: 39
+  unique_name: dbs
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: blood spot gedroogd
+- id: http://purl.org/np/RA1o0YMyxe1aEd9XfmfqRG3pHNL_wSlYQ1a6RaLaNjfJY
+  aggregation_target: false
+  name: indoor dust
+  parent_matrix: peh:air
+  sort_order: 29
+  unique_name: idust
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: binnen stof
+- id: http://purl.org/np/RAD5Aa-B4j5Ij5uAWRE2Na8HaR17DCnO5qhLi9shdanLk
+  aggregation_target: false
+  name: blood-whole blood
+  parent_matrix: peh:blood
+  sort_order: 1
+  unique_name: bwb
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed-volbloed
+- id: http://purl.org/np/RAHhZvGzdR8w5BffyJKxn-lmQLSz7TLAgOP00r5VjAbjg
+  aggregation_target: false
+  name: amniotic fluid
+  sort_order: 27
+  unique_name: af
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: vruchtwater
+- id: http://purl.org/np/RA2NNQh_oQlQsZxCdYCeAvsra1_cCSZtBNCqlO45uV9Pw
+  aggregation_target: false
+  name: first morning urine
+  parent_matrix: peh:urine
+  sort_order: 11
+  unique_name: um
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: eerste ochtend-urine
+- id: http://purl.org/np/RA-EwNW4A6VeAiEO1VI1mK24k2OUUX6f12z2hEBGvVLtQ
+  aggregation_target: false
+  name: personal air
+  parent_matrix: peh:air
+  sort_order: 33
+  unique_name: pair
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: persoonlijke lucht
+- id: http://purl.org/np/RAduqs8MirWSZZzu2Y46cTw2MvOIpSd5g1YFCxmLGgzK8
+  aggregation_target: false
+  name: urine 24h
+  parent_matrix: peh:urine
+  sort_order: 13
+  unique_name: ud
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: urine 24u
+- id: http://purl.org/np/RAySRe91V4Of16LVoF1LhujeTvAqa5Ktt-hHjLK7f_YkE
+  aggregation_target: false
+  name: indoor air-stationary
+  parent_matrix: peh:air
+  sort_order: 32
+  unique_name: iair
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: binnenlucht
+- id: http://purl.org/np/RAS0XbPABHWk0Vj5n1FHLwRB3vpduafXc9Rqu0Goctfik
+  aggregation_target: false
+  name: air
+  sort_order: 0
+  unique_name: air
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: lucht
+- id: http://purl.org/np/RAIJk-HTWmCHKsXSCx7GKn1Ji7Agptdk-8_U6phpvbb9c
+  aggregation_target: false
+  name: food
+  sort_order: 0
+  unique_name: food
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: voedsel
+- id: http://purl.org/np/RAENzKD7pRxUxI5mnUJS8Yz21JBDMN21XowWNh4yjGw4U
+  aggregation_target: false
+  name: bloodcells
+  sort_order: 0
+  unique_name: bloodcells
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloedcellen
+- id: http://purl.org/np/RAoMVgpZr9PKXcgxyiuocJVS9X7nmZ8kgj_JgBj3iq3LM
+  aggregation_target: false
+  name: urine
+  sort_order: 0
+  unique_name: urine
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: urine
+- id: http://purl.org/np/RAz11eST2IC5uNHLC5pSKF9gI2iLLbk4QtIWRvqZlFY5A
+  aggregation_target: false
+  name: cord blood
+  sort_order: 0
+  unique_name: cord blood
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: navelstrengbloed
+- id: http://purl.org/np/RAyGRwTeX-9azkxGcXeWW8KPz-RMl19dvNIA0zmNZlKao
+  aggregation_target: false
+  name: blood
+  sort_order: 0
+  unique_name: blood
+  translations:
+  - property_name: name
+    language: nl-be
+    translated_value: bloed

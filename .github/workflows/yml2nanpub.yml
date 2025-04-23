@@ -1,0 +1,183 @@
+name: Publish Vocabulary from LinkML to Nanopub
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git reference (branch, tag, or commit SHA) to checkout'
+        required: true
+        type: string
+      version:
+        description: 'Version of the vocabulary being published'
+        required: false
+        type: string
+        default: ''
+      linkml_schema:
+        description: 'Path to the LinkML schema file'
+        required: true
+        type: string
+      data:
+        description: 'Path to the data file containing entities to publish'
+        required: true
+        type: string
+      target_name:
+        description: 'Name of the target entity list in the data file'
+        required: true
+        type: string
+      server_mode:
+        description: 'Server mode: "test" for test server, "production" for production'
+        type: string
+        default: 'test'
+      dry_run:
+        description: 'If true, signs nanopubs but does not publish them'
+        type: boolean
+        default: false
+      parent_key:
+        description: 'Parent key to be provided for topological sort'
+        type: string
+        required: false
+      
+    secrets:
+      token:
+        description: 'GitHub token for repository checkout'
+        required: true
+      NANOPUB_ORCID_ID:
+        description: 'ORCID ID for nanopub profile'
+        required: true
+      NANOPUB_NAME:
+        description: 'Name for nanopub profile'
+        required: true
+      NANOPUB_PRIVATE_KEY:
+        description: 'Private key for nanopub profile'
+        required: true
+      NANOPUB_PUBLIC_KEY:
+        description: 'Public key for nanopub profile'
+        required: true
+      NANOPUB_INTRO_URI:
+        description: 'Introduction nanopub URI'
+        required: true
+          
+jobs:
+  publish-nanopubs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.token }}
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install linkml nanopub click rdflib
+
+      - name: Cache downloaded script
+        id: cache-script
+        uses: actions/cache@v3
+        with:
+          path: ./publish_nanopubs.py
+          key: nanopub-script-${{ hashFiles('**/workflow.yml') }}
+
+      - name: Download publish_nanopubs.py
+        if: steps.cache-script.outputs.cache-hit != 'true'
+        run: |
+          curl -s -o publish_nanopubs.py https://raw.githubusercontent.com/eu-parc/voc2nanopub/main/rules/publish_nanopubs.py
+          chmod +x publish_nanopubs.py
+      
+      - name: Validate inputs
+        run: |
+          if [ ! -f "${{ inputs.linkml_schema }}" ]; then
+            echo "ERROR: LinkML schema file not found at ${{ inputs.linkml_schema }}"
+            exit 1
+          fi
+          
+          if [ ! -f "${{ inputs.data }}" ]; then
+            echo "ERROR: Data file not found at ${{ inputs.data }}"
+            exit 1
+          fi
+
+      - name: Set server flag
+        id: set-server-flag
+        run: |
+          if [ "${{ inputs.server_mode }}" == "production" ]; then
+            echo "SERVER_FLAG=--production-server" >> $GITHUB_OUTPUT
+          else
+            echo "SERVER_FLAG=--test-server" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set dry run flag
+        id: set-dry-run
+        run: |
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_OUTPUT
+          else
+            echo "DRY_RUN_FLAG=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish Nanopubs
+        id: publish
+        continue-on-error: true
+        run: |
+          python3 publish_nanopubs.py \
+            --schema "${{ inputs.linkml_schema }}" \
+            --data "${{ inputs.data }}" \
+            --parent-key "${{ inputs.parent_key }}" \ 
+            --target "${{ inputs.target_name }}" \
+            ${{ steps.set-server-flag.outputs.SERVER_FLAG }} \
+            ${{ steps.set-dry-run.outputs.DRY_RUN_FLAG }} \
+            --verbose
+        env:
+          NANOPUB_ORCID_ID: ${{ secrets.NANOPUB_ORCID_ID }}
+          NANOPUB_NAME: ${{ secrets.NANOPUB_NAME }}
+          NANOPUB_PRIVATE_KEY: ${{ secrets.NANOPUB_PRIVATE_KEY }}
+          NANOPUB_PUBLIC_KEY: ${{ secrets.NANOPUB_PUBLIC_KEY }}
+          NANOPUB_INTRO_URI: ${{ secrets.NANOPUB_INTRO_URI }}
+          VERSION: ${{ inputs.version }}
+      
+      - name: Check for errors
+        if: steps.publish.outcome != 'success'
+        run: |
+          echo "::error::Nanopub publishing failed"
+          exit 1
+
+      - name: Push updated yaml to repository
+        run: # TODO: add code this step should be skipped if dry_run
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: nanopub-logs
+          path: |
+            nanopub-*.log
+          retention-days: 1
+    
+      - name: Push updated yaml to repository
+        if: inputs.dry_run != true
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          # Check if there are changes
+          if git diff --exit-code ${{ inputs.data }}; then
+            echo "No changes to commit"
+          else
+            echo "Changes detected, committing and pushing"
+            git add "${{ inputs.data }}"
+            git commit -m "Update nanopub IDs in ${{ inputs.data }} [skip ci]"
+            git push origin ${{ github.ref }}
+          fi
+        
