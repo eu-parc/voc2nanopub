@@ -15,6 +15,7 @@ import logging
 
 from collections import defaultdict, deque
 from pathlib import Path
+from rdflib.namespace import SKOS, RDF
 from typing import List, Optional, Mapping
 
 from linkml_runtime.utils.schemaview import SchemaView
@@ -179,6 +180,31 @@ def add_translation_to_graph(
     return g
 
 
+def add_vocabulary_membership(
+    g: rdflib.Graph, vocab_uri: str, subject_type: rdflib.URIRef
+) -> rdflib.Graph:
+    """
+    Adds vocabulary membership information to each concept in the graph.
+
+    Args:
+        g: An rdflib Graph instance containing vocabulary terms
+        vocab_uri: URI string of the vocabulary collection
+
+    Returns:
+        The modified graph with vocabulary membership added
+    """
+    # Create a URI reference for the vocabulary
+    vocabulary = rdflib.URIRef(vocab_uri)
+    # Get all subjects that are skos:Concept instances
+    concepts = list(g.subjects(RDF.type, subject_type))
+    SKOS_COLLECTION = SKOS.inScheme
+    # Add the membership triple to each concept
+    for concept in concepts:
+        g.add((concept, SKOS_COLLECTION, vocabulary))
+
+    return g
+
+
 def is_nanopub_id(key: str):
     allowed_prefixes = [
         "http://purl.org",
@@ -219,6 +245,7 @@ def build_rdf_graph(
     entity: "YAMLRoot",
     schema_view: SchemaView,
     translation_namespace_mapping: Optional[Mapping] = None,
+    vocab_uri: Optional[str] = None,
 ) -> rdflib.Graph:
     """
     Convert a LinkML entity to an RDF graph.
@@ -235,6 +262,16 @@ def build_rdf_graph(
         g = rdflib.Graph()
         g.parse(data=rdf_string)
         assert len(g) < nanopub.definitions.MAX_TRIPLES_PER_NANOPUB
+        # ADD vocabulary membership
+        if vocab_uri is not None:
+            entity_class_name = entity.__class__.__name__
+            # example: subject_type = SKOS.Concept
+            class_curie = schema_view.get_uri(entity_class_name)
+            class_uri = schema_view.expand_curie(class_curie)
+            subject_type = rdflib.term.URIRef(class_uri)
+            g = add_vocabulary_membership(
+                g, vocab_uri=vocab_uri, subject_type=subject_type
+            )
         # ADD TRANSLATION
         if translation_namespace_mapping is not None:
             g = add_translation_to_graph(g, translation_namespace_mapping)
@@ -320,6 +357,14 @@ def build_rdf_graph(
     help="Path to output YAML data file",
     default=None,
 )
+@click.option(
+    "--vocab",
+    "vocab_uri",
+    required=False,
+    type=str,
+    help="URI for the larger vocabulary this term is part of.",
+    default=None,
+)
 def main(
     schema_path: str,
     data_path: str,
@@ -334,6 +379,7 @@ def main(
     dry_run: bool = False,
     verbose: bool = False,
     output_path: str = None,
+    vocab_uri: str = None,
 ):
     """
     Create and publish nanopublications from structured data.
@@ -384,7 +430,9 @@ def main(
         # Process each entity and publish as nanopub
         for entity in entities:
             np_uri = None
-            graph = build_rdf_graph(entity, schema_view, namespace_mapping)
+            graph = build_rdf_graph(
+                entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
+            )
             processed += 1
 
             # Check if this nanopub already exists
