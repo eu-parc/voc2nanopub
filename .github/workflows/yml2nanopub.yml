@@ -88,15 +88,28 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install linkml nanopub click rdflib
 
+      - name: Check if script exists in current branch
+        id: check-script
+        run: |
+          if [ -f "./rules/publish_nanopubs.py" ]; then
+            echo "SCRIPT_PATH=./rules/publish_nanopubs.py" >> $GITHUB_OUTPUT
+            echo "Script found in repository"
+          else
+            echo "SCRIPT_PATH=./publish_nanopubs.py" >> $GITHUB_OUTPUT
+            echo "Script not found in repository, will download"
+          fi
+
       - name: Cache downloaded script
         id: cache-script
+        if: steps.check-script.outputs.SCRIPT_PATH == './publish_nanopubs.py'
         uses: actions/cache@v3
         with:
           path: ./publish_nanopubs.py
           key: nanopub-script-${{ hashFiles('**/workflow.yml') }}
+        
 
       - name: Download publish_nanopubs.py
-        if: steps.cache-script.outputs.cache-hit != 'true'
+        if: steps.check-script.outputs.SCRIPT_PATH == './publish_nanopubs.py' && steps.cache-script.outputs.cache-hit != 'true'
         run: |
           curl -s -o publish_nanopubs.py https://raw.githubusercontent.com/eu-parc/voc2nanopub/main/rules/publish_nanopubs.py
           chmod +x publish_nanopubs.py
@@ -135,10 +148,10 @@ jobs:
         id: publish
         continue-on-error: true
         run: |
-          python3 publish_nanopubs.py \
+          python3 ${{ steps.check-script.outputs.SCRIPT_PATH }} \
             --schema "${{ inputs.linkml_schema }}" \
             --data "${{ inputs.data }}" \
-            --parent-key "${{ inputs.parent_key }}" \ 
+            --parent-key "${{ inputs.parent_key }}" \
             --target "${{ inputs.target_name }}" \
             --output "${{ inputs.output }}" \
             ${{ steps.set-server-flag.outputs.SERVER_FLAG }} \
