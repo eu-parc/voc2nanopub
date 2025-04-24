@@ -170,15 +170,6 @@ jobs:
         run: |
           echo "::error::Nanopub publishing failed"
           exit 1
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nanopub-logs
-          path: |
-            nanopub-*.log
-          retention-days: 1
     
       - name: Push updated yaml to repository
         if: inputs.dry_run != true

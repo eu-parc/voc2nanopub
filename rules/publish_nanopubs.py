@@ -403,6 +403,7 @@ def main(
 
             ## modify parent key
             # check if parent_key has been set
+            old_id = getattr(entity, "id")
             if parent_key is not None:
                 old_parent_key = getattr(entity, parent_key)
                 # check if a particular entity has a parent_key field
@@ -413,12 +414,11 @@ def main(
                             raise AssertionError("new_parent_key is None.")
                         setattr(entity, parent_key, new_parent_key)
 
-                old_id = getattr(entity, "id")
                 id_map[old_id] = np_uri
 
             # modify entity uri
             setattr(entity, "id", np_uri)
-            logger.info(f"URI generated: {np_uri}")
+            logger.info(f"URI generated: {np_uri} for entity: {old_id}")
 
             if not dry_run:
                 publication_info = np.publish()
