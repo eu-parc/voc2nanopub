@@ -158,9 +158,6 @@ jobs:
           echo "::error::Nanopub publishing failed"
           exit 1
 
-      - name: Push updated yaml to repository
-        run: # TODO: add code this step should be skipped if dry_run
-
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v3
@@ -185,4 +182,4 @@ jobs:
             git commit -m "Update nanopub IDs in ${{ inputs.data }} [skip ci]"
             git push origin ${{ github.ref }}
           fi
-        
+
