@@ -28,7 +28,6 @@ classes:
       - unique_name
 
   HasTranslations:
-    class_uri: thesoz:hasTranslation
     mixin: true
     slots:
       - translations

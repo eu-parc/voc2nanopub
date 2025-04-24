@@ -3,10 +3,7 @@
 Nanopub Batch Upload GitHub Action Script
 
 TODO:
-- update parent id
 - add ability to restrict model to NamedThing if graph is too large
-- skip incorporating identifier if id is already there
-- add graph modification step in case of translations
 """
 
 import sys
@@ -15,10 +12,12 @@ import nanopub
 import nanopub.definitions
 import rdflib
 import logging
-from pathlib import Path
-from typing import List, Optional
 
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional, Mapping, Union
+
 from linkml_runtime.utils.schemaview import SchemaView
 from linkml_runtime.loaders import YAMLLoader
 from linkml_runtime.dumpers import YAMLDumper
@@ -31,6 +30,9 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+BASE_NAMESPACE = rdflib.Namespace("https://w3id.org/peh/peh-model")
 
 
 def topological_sort(
@@ -68,28 +70,6 @@ def topological_sort(
 
     # Return sorted objects
     return [obj_map[obj_id] for obj_id in sorted_ids]
-
-
-def build_rdf_graph(entity: "YAMLRoot", schema_view: SchemaView) -> rdflib.Graph:
-    """
-    Convert a LinkML entity to an RDF graph.
-
-    Args:
-        entity: The LinkML entity to convert
-        schema_view: The schema view defining the entity structure
-
-    Returns:
-        An RDF graph representing the entity
-    """
-    try:
-        rdf_string = RDFLibDumper().dumps(entity, schema_view)
-        g = rdflib.Graph()
-        g.parse(data=rdf_string)
-        assert len(g) < nanopub.definitions.MAX_TRIPLES_PER_NANOPUB
-        return g
-    except Exception as e:
-        logger.error(f"Error converting entity to RDF: {e}")
-        raise
 
 
 def load_yaml(
@@ -152,12 +132,60 @@ def process_yaml_root(
         logger.error(f"Error in process_yaml_root: {e}")
         raise
 
+
+def get_property_mapping(
+    data: List, schema_view: SchemaView, base: rdflib.Namespace
+) -> Mapping:
+    """
+    Mapping of the kind: {property_name: slot_uri}
+    example: {'name': rdflib.term.URIRef('http://www.w3.org/2004/02/skos/core#altLabel')}
+    """
+    namespace_mapping = {}
+    for entity in data:
+        if getattr(entity, "translations") is not None:
+            for translation in entity.translations:
+                if translation.property_name not in namespace_mapping:
+                    property_name = translation.property_name
+                    slot_def = schema_view.all_slots().get(property_name)
+                    curie_str = getattr(slot_def, "slot_uri")
+                    if curie_str is None:
+                        curie_str = base[property_name]
+                    uri_str = schema_view.expand_curie(curie_str)
+                    namespace_mapping[property_name] = rdflib.term.URIRef(uri_str)
+
+    return namespace_mapping
+
+
+def add_translation_to_graph(
+    g: rdflib.Graph, property_mapping: Mapping
+) -> rdflib.Graph:
+    if len(property_mapping) == 0:
+        logger.info("LinkML schema does not contain translations.")
+        return g
+
+    #  Iterate over the triples and perform the transformation and removal
+    for s, _, o in g.triples((None, BASE_NAMESPACE.translations, None)):
+        language = g.value(o, BASE_NAMESPACE.language)
+        property_name = str(g.value(o, BASE_NAMESPACE.property_name))
+        translated_value = g.value(o, BASE_NAMESPACE.translated_value)
+        # Apply the mapping
+        if property_name in property_mapping:
+            mapped_property = property_mapping[property_name]
+            g.add((s, mapped_property, rdflib.Literal(translated_value, lang=language)))
+
+        # Remove the unnecessary blank node triples
+        g.remove((o, None, None))
+        g.remove((None, None, o))
+
+    return g
+
+
 def is_nanopub_id(key: str):
     allowed_prefixes = [
         "http://purl.org",
         "https://purl.org",
         "http://w3id.org",
-        "https://w3id.org"
+        "https://w3id.org",
     ]
     for prefix in allowed_prefixes:
         if key.startswith(prefix):
@@ -165,12 +193,13 @@ def is_nanopub_id(key: str):
     return False
 
 
-def check_nanopub_existence(
-    np_conf: nanopub.NanopubConf, entity: YAMLRoot
-) -> bool:
+def check_nanopub_existence(np_conf: nanopub.NanopubConf, entity: YAMLRoot) -> bool:
     try:
         url = getattr(entity, "id", None)
-        return is_nanopub_id(url)
+        if url is not None:
+            return is_nanopub_id(url)
+        else:
+            raise ValueError("Entity id is None.")
 
     except Exception as e:
         logger.error(f"Error in check_nanopub_existence: {e}")
@@ -180,6 +209,44 @@ def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
     # Use setattr to update the target field
     setattr(root, target_name, entities)
     return YAMLDumper().dump(root, to_file=file_name)
+
+
+def is_valid_assertion_graph(g: rdflib.Graph) -> bool:
+    # TODO: add more checks
+    return len(g) > 0
+
+
+def build_rdf_graph(
+    entity: "YAMLRoot",
+    schema_view: SchemaView,
+    translation_namespace_mapping: Optional[Mapping] = None,
+) -> rdflib.Graph:
+    """
+    Convert a LinkML entity to an RDF graph.
+
+    Args:
+        entity: The LinkML entity to convert
+        schema_view: The schema view defining the entity structure
+
+    Returns:
+        An RDF graph representing the entity
+    """
+    try:
+        rdf_string = RDFLibDumper().dumps(entity, schema_view)
+        g = rdflib.Graph()
+        g.parse(data=rdf_string)
+        assert len(g) < nanopub.definitions.MAX_TRIPLES_PER_NANOPUB
+        # ADD TRANSLATION
+        if translation_namespace_mapping is not None:
+            g = add_translation_to_graph(g, translation_namespace_mapping)
+
+        if is_valid_assertion_graph(g):
+            return g
+        else:
+            raise AssertionError("Assertion Graph is invalid.")
+    except Exception as e:
+        logger.error(f"Error converting entity to RDF: {e}")
+        raise
 
 
 @click.command()
@@ -267,7 +334,7 @@ def main(
     test_server: bool = True,
     dry_run: bool = False,
     verbose: bool = False,
-    output: str = None,
+    output_path: str = None,
 ):
     """
     Create and publish nanopublications from structured data.
@@ -312,10 +379,13 @@ def main(
         )
         id_map = {}
 
+        namespace_mapping = get_property_mapping(entities, schema_view, BASE_NAMESPACE)
+        if len(namespace_mapping) == 0:
+            namespace_mapping = None
         # Process each entity and publish as nanopub
         for entity in entities:
             np_uri = None
-            graph = build_rdf_graph(entity, schema_view)
+            graph = build_rdf_graph(entity, schema_view, namespace_mapping)
             processed += 1
 
             # Check if this nanopub already exists
@@ -331,23 +401,25 @@ def main(
             np_uri = np.metadata.np_uri
             if np_uri is None:
                 raise ValueError("no URI returned by nanpub server.")
-            
-            # modify parent key
+
+            ## modify parent key
+            # check if parent_key has been set
             if parent_key is not None:
                 old_parent_key = getattr(entity, parent_key)
-                if not is_nanopub_id(old_parent_key):
-                    new_parent_key = id_map.get(old_parent_key, None)
-                    assert new_parent_key is not None
-                    setattr(entity, parent_key, new_parent_key)
-            
+                # check if a particular entity has a parent_key field
+                if old_parent_key is not None:
+                    if not is_nanopub_id(old_parent_key):
+                        new_parent_key = id_map.get(old_parent_key, None)
+                        if new_parent_key is None:
+                            raise AssertionError("new_parent_key is None.")
+                        setattr(entity, parent_key, new_parent_key)
+
                 old_id = getattr(entity, "id")
                 id_map[old_id] = np_uri
-            
+
             # modify entity uri
             setattr(entity, "id", np_uri)
-            logger.info(
-                f"URI generated: {np_uri}"
-            )
+            logger.info(f"URI generated: {np_uri}")
 
             if not dry_run:
                 publication_info = np.publish()
@@ -360,9 +432,9 @@ def main(
             f"Published: {published}, Skipped: {skipped}"
         )
 
-        if output is None:
-            output = data_path
-        return yaml_dump(yaml_root, target_name, entities, output)
+        if output_path is None:
+            output_path = data_path
+        return yaml_dump(yaml_root, target_name, entities, output_path)
 
     except Exception as e:
         logger.error(f"Error in nanopub processing: {e}")
