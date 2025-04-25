@@ -9,12 +9,13 @@ TODO:
 
 import sys
 import click
+import hashlib
+import logging
 import nanopub
 import nanopub.definitions
+import pathlib
 import rdflib
-import logging
-import hashlib
-import traceback
+
 
 from collections import defaultdict, deque
 from pathlib import Path
@@ -36,7 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-BASE_NAMESPACE = rdflib.Namespace("https://w3id.org/peh/peh-model")
+BASE_NAMESPACE = rdflib.Namespace("https://w3id.org/peh/terms/")
 PEH_NAMESPACE = "https://w3id.org/peh/"
 
 
@@ -509,6 +510,14 @@ def build_rdf_graph(
     default=None,
 )
 @click.option(
+    "--output-pairs",
+    "output_path_pairs",
+    required=False,
+    type=click.Path(),
+    help="Path to output identifier nanopub pairs",
+    default=None,
+)
+@click.option(
     "--vocab",
     "vocab_uri",
     required=False,
@@ -546,6 +555,7 @@ def main(
     dry_run: bool = False,
     verbose: bool = False,
     output_path: str = None,
+    output_path_pairs: str = None,
     vocab_uri: str = None,
     type_prefix: str = None,
 ):
@@ -655,7 +665,10 @@ def main(
         _ = yaml_dump(yaml_root, target_name, entities, output_path)
 
         # dump identifier_pairs
-        _ = dump_identifier_pairs(identifier_pairs, "pairs.txt")
+        if output_path_pairs is None:
+            output_path_pairs = "./pairs.txt"
+        output_path_pairs = pathlib.Path(output_path_pairs).resolve()
+        _ = dump_identifier_pairs(identifier_pairs, output_path_pairs)
 
     except Exception as e:
         logger.error(f"Error in processing: {e}")
