@@ -4,6 +4,7 @@ Nanopub Batch Upload GitHub Action Script
 
 TODO:
 - add ability to restrict model to NamedThing if graph is too large
+- figure out when default namespace is used and when model id
 """
 
 import sys
@@ -12,11 +13,14 @@ import nanopub
 import nanopub.definitions
 import rdflib
 import logging
+import hashlib
+import traceback
 
 from collections import defaultdict, deque
 from pathlib import Path
 from rdflib.namespace import SKOS, RDF
-from typing import List, Optional, Mapping
+from uuid import uuid4
+from typing import List, Optional, Mapping, Set
 
 from linkml_runtime.utils.schemaview import SchemaView
 from linkml_runtime.loaders import YAMLLoader
@@ -33,6 +37,148 @@ logger = logging.getLogger(__name__)
 
 
 BASE_NAMESPACE = rdflib.Namespace("https://w3id.org/peh/peh-model")
+PEH_NAMESPACE = "https://w3id.org/peh/"
+
+
+class IdentifierGenerator:
+    def __init__(
+        self, type_prefix: Optional[str] = None, namespace: str = PEH_NAMESPACE
+    ):
+        self.namespace = namespace
+        self.type_prefix = type_prefix
+        self.registered_ids: Set[str] = set()
+
+    def is_id_available(self, identifier: str) -> bool:
+        if identifier in self.registered_ids:
+            return False
+
+        return True
+
+    def is_namespace_id(self, key: str):
+        if key.startswith(self.namespace):
+            return True
+        return False
+
+    def register_id(self, identifier: str) -> None:
+        self.registered_ids.add(identifier)
+
+    def generate_id(
+        self,
+        term_name: str,
+        method: str = "hash",
+        check_collision: bool = True,
+        max_attempts: int = 10,
+    ) -> str:
+        """
+        Generate a structured identifier for a vocabulary term with collision detection.
+
+        Args:
+            term_name: The name of the term
+            method: ID generation method ('uuid', 'hash', 'sequential', or 'slug')
+            check_collision: Whether to check for collisions
+            max_attempts: Maximum number of attempts to generate a unique ID
+
+        Returns:
+            A structured identifier that's unique and available
+        """
+        attempts = 0
+
+        while attempts < max_attempts:
+            # Generate unique part based on method
+            if method == "uuid":
+                unique_part = str(uuid4())[:8]  # First 8 chars of UUID
+
+            elif method == "hash":
+                # Create a hash of the term name, possibly with a salt for retry attempts
+                if attempts > 0:
+                    salted_name = f"{term_name}-attempt-{attempts}"
+                else:
+                    salted_name = term_name
+
+                hash_obj = hashlib.md5(salted_name.encode())
+                unique_part = hash_obj.hexdigest()[:10]
+
+            else:
+                raise ValueError(
+                    f"Unknown method: {method}. Available methods: uuid, hash, sequential, slug"
+                )
+
+            # Construct the full identifier
+            if self.type_prefix is None:
+                identifier = f"{self.namespace}{unique_part}"
+            else:
+                identifier = f"{self.namespace}{self.type_prefix}-{unique_part}"
+
+            # Check if this identifier is available
+            if check_collision:
+                if self.is_id_available(identifier):
+                    # Register the ID as used
+                    self.register_id(identifier)
+                    return identifier
+            else:
+                return identifier
+
+            # If we got here, there was a collision - try again
+            attempts += 1
+
+        # If we exhausted all attempts, raise an error
+        raise RuntimeError(
+            f"Could not generate a unique identifier for '{term_name}' after {max_attempts} attempts"
+        )
+
+
+class NanopubGenerator:
+    def __init__(
+        self,
+        orcid_id: str,
+        name: str,
+        private_key: str,
+        public_key: str,
+        intro_nanopub_uri: str,
+        test_server: bool,
+    ):
+        self.profile = nanopub.Profile(
+            orcid_id=orcid_id,
+            name=name,
+            private_key=private_key,
+            public_key=public_key,
+            introduction_nanopub_uri=intro_nanopub_uri,
+        )
+
+        self.np_conf = nanopub.NanopubConf(
+            profile=self.profile,
+            use_test_server=test_server,
+            add_prov_generated_time=True,
+            attribute_publication_to_profile=True,
+        )
+
+    def create_nanopub(self, assertion: rdflib.Graph) -> nanopub.Nanopub:
+        return nanopub.Nanopub(conf=self.np_conf, assertion=assertion)
+
+    @classmethod
+    def is_nanopub_id(cls, key: str):
+        allowed_prefixes = [
+            "http://purl.org",
+            "https://purl.org",
+            "http://w3id.org",
+            "https://w3id.org",
+        ]
+        for prefix in allowed_prefixes:
+            if key.startswith(prefix):
+                return True
+        return False
+
+    def check_nanopub_existence(self, entity: YAMLRoot) -> bool:
+        try:
+            # np_conf = self.np_conf
+            url = getattr(entity, "id", None)
+            if url is not None:
+                return self.is_nanopub_id(url)
+            else:
+                raise ValueError("Entity id is None.")
+
+        except Exception as e:
+            logger.error(f"Error in check_nanopub_existence: {e}")
 
 
 def topological_sort(
@@ -159,25 +305,36 @@ def get_property_mapping(
 def add_translation_to_graph(
     g: rdflib.Graph, property_mapping: Mapping
 ) -> rdflib.Graph:
-    if len(property_mapping) == 0:
-        logger.info("LinkML schema does not contain translations.")
+    try:
+        if len(property_mapping) == 0:
+            logger.info("LinkML schema does not contain translations.")
+            return g
+
+        #  Iterate over the triples and perform the transformation and removal
+        for s, _, o in g.triples((None, BASE_NAMESPACE.translations, None)):
+            language = g.value(o, BASE_NAMESPACE.language)
+            property_name = str(g.value(o, BASE_NAMESPACE.property_name))
+            translated_value = g.value(o, BASE_NAMESPACE.translated_value)
+            # Apply the mapping
+            if property_name in property_mapping:
+                mapped_property = property_mapping[property_name]
+                g.add(
+                    (
+                        s,
+                        mapped_property,
+                        rdflib.Literal(translated_value, lang=language),
+                    )
+                )
+
+            # Remove the unnecessary blank node triples
+            g.remove((o, None, None))
+            g.remove((None, None, o))
+
         return g
 
-    #  Iterate over the triples and perform the transformation and removal
-    for s, _, o in g.triples((None, BASE_NAMESPACE.translations, None)):
-        language = g.value(o, BASE_NAMESPACE.language)
-        property_name = str(g.value(o, BASE_NAMESPACE.property_name))
-        translated_value = g.value(o, BASE_NAMESPACE.translated_value)
-        # Apply the mapping
-        if property_name in property_mapping:
-            mapped_property = property_mapping[property_name]
-            g.add((s, mapped_property, rdflib.Literal(translated_value, lang=language)))
-
-        # Remove the unnecessary blank node triples
-        g.remove((o, None, None))
-        g.remove((None, None, o))
-
-    return g
+    except Exception as e:
+        logging.error(f"Error in add_translation_to_graph: {e}")
+        raise
 
 
 def add_vocabulary_membership(
@@ -193,47 +350,36 @@ def add_vocabulary_membership(
     Returns:
         The modified graph with vocabulary membership added
     """
-    # Create a URI reference for the vocabulary
-    vocabulary = rdflib.URIRef(vocab_uri)
-    # Get all subjects that are skos:Concept instances
-    concepts = list(g.subjects(RDF.type, subject_type))
-    SKOS_COLLECTION = SKOS.inScheme
-    # Add the membership triple to each concept
-    for concept in concepts:
-        g.add((concept, SKOS_COLLECTION, vocabulary))
-
-    return g
-
-
-def is_nanopub_id(key: str):
-    allowed_prefixes = [
-        "http://purl.org",
-        "https://purl.org",
-        "http://w3id.org",
-        "https://w3id.org",
-    ]
-    for prefix in allowed_prefixes:
-        if key.startswith(prefix):
-            return True
-    return False
-
-
-def check_nanopub_existence(np_conf: nanopub.NanopubConf, entity: YAMLRoot) -> bool:
     try:
-        url = getattr(entity, "id", None)
-        if url is not None:
-            return is_nanopub_id(url)
-        else:
-            raise ValueError("Entity id is None.")
+        # Create a URI reference for the vocabulary
+        vocabulary = rdflib.URIRef(vocab_uri)
+        concepts = list(g.subjects(RDF.type, subject_type))
+        SKOS_COLLECTION = SKOS.inScheme
+        # Add the membership triple to each concept
+        for concept in concepts:
+            g.add((concept, SKOS_COLLECTION, vocabulary))
 
+        return g
     except Exception as e:
-        logger.error(f"Error in check_nanopub_existence: {e}")
+        logging.error(f"Error in add_vocabulary_membership: {e}")
+        raise
 
 
 def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
     # Use setattr to update the target field
     setattr(root, target_name, entities)
     return YAMLDumper().dump(root, to_file=file_name)
+
+
+def dump_identifier_pairs(pairs: List[tuple], file_name: str):
+    try:
+        with open(file_name, "w") as outfile:
+            for pair in pairs:
+                w3id_uri, nanopub_uri = pair
+                print(f"{w3id_uri}, {nanopub_uri}", file=outfile)
+    except Exception as e:
+        logging.error(f"Error in dump_identifier_pairs: {e}")
+        raise
 
 
 def is_valid_assertion_graph(g: rdflib.Graph) -> bool:
@@ -275,13 +421,18 @@ def build_rdf_graph(
         # ADD TRANSLATION
         if translation_namespace_mapping is not None:
             g = add_translation_to_graph(g, translation_namespace_mapping)
-
         if is_valid_assertion_graph(g):
             return g
         else:
             raise AssertionError("Assertion Graph is invalid.")
     except Exception as e:
-        logger.error(f"Error converting entity to RDF: {e}")
+        logger.error("Error converting entity to RDF:", exc_info=True)
+        logger.debug("Entity details: %s", entity)
+        logger.debug(
+            "Additional context: vocab_uri=%s, translation_namespace_mapping=%s",
+            vocab_uri,
+            translation_namespace_mapping,
+        )
         raise
 
 
@@ -365,6 +516,21 @@ def build_rdf_graph(
     help="URI for the larger vocabulary this term is part of.",
     default=None,
 )
+@click.option(
+    "--type-prefix",
+    "type_prefix",
+    required=False,
+    type=str,
+    default=None,
+    help="Vocabulary-specific prefix for uri to be generated.",
+)
+@click.option(
+    "--preflabel",
+    "preflabel",
+    required=True,
+    type=str,
+    help="Key to human readable identifier field for resource.",
+)
 def main(
     schema_path: str,
     data_path: str,
@@ -375,11 +541,13 @@ def main(
     private_key: str,
     public_key: str,
     intro_nanopub_uri: str,
+    preflabel: str,
     test_server: bool = True,
     dry_run: bool = False,
     verbose: bool = False,
     output_path: str = None,
     vocab_uri: str = None,
+    type_prefix: str = None,
 ):
     """
     Create and publish nanopublications from structured data.
@@ -393,80 +561,83 @@ def main(
         logger.setLevel(logging.DEBUG)
 
     try:
-        # Create nanopub profile
-        profile = nanopub.Profile(
-            orcid_id=orcid_id,
-            name=name,
-            private_key=private_key,
-            public_key=public_key,
-            introduction_nanopub_uri=intro_nanopub_uri,
-        )
-
-        # Create nanopub configuration
-        np_conf = nanopub.NanopubConf(
-            profile=profile,
-            use_test_server=test_server,
-            add_prov_generated_time=True,
-            attribute_publication_to_profile=True,
-        )
-
-        logger.info(f"Processing data from {data_path} using schema {schema_path}")
-
+        id_map = {}
+        identifier_pairs = []
         # Count for reporting
         processed = 0
         published = 0
         skipped = 0
+
+        nanopub_generator = NanopubGenerator(
+            orcid_id=orcid_id,
+            name=name,
+            private_key=private_key,
+            public_key=public_key,
+            intro_nanopub_uri=intro_nanopub_uri,
+            test_server=test_server,
+        )
+        id_generator = IdentifierGenerator(type_prefix=type_prefix)
+
+        logger.info(f"Processing data from {data_path} using schema {schema_path}")
 
         # load data
         yaml_root, schema_view = load_yaml(schema_path, data_path)
         entities = process_yaml_root(
             yaml_root, target_name, id_key="id", parent_key=parent_key
         )
-        id_map = {}
-
+        # make namespace mapping for language annotation purposes
         namespace_mapping = get_property_mapping(entities, schema_view, BASE_NAMESPACE)
         if len(namespace_mapping) == 0:
             namespace_mapping = None
-        # Process each entity and publish as nanopub
+        # Process each entity, generate identifier and publish nanopub
         for entity in entities:
-            np_uri = None
+            # create identifier
+            current_id = getattr(entity, "id")
+            if id_generator.is_namespace_id(current_id):
+                id_generator.register_id(current_id)
+                logger.info(f"Entity {current_id} already exists, skipping")
+                skipped += 1
+                continue
+            peh_uri = id_generator.generate_id(getattr(entity, preflabel))
+
+            ## modify parent key
+            # check if parent_key has been set
+            old_id = getattr(entity, "id")
+            if parent_key is not None:
+                old_parent_key_value = getattr(entity, parent_key)
+                # check if a particular entity has a parent_key field
+                if old_parent_key_value is not None:
+                    if not id_generator.is_namespace_id(old_parent_key_value):
+                        new_parent_key_value = id_map.get(old_parent_key_value, None)
+                        if new_parent_key_value is None:
+                            raise AssertionError("Parent key was not found in id_map.")
+                        new_parent_key_value_entity = getattr(
+                            entity, parent_key
+                        ).__class__(new_parent_key_value)
+                        setattr(entity, parent_key, new_parent_key_value_entity)
+
+                id_map[old_id] = peh_uri
+
+            # modify entity uri
+            setattr(entity, "id", peh_uri)
+            logger.info(f"URI generated: {peh_uri} for entity: {old_id}")
+
             graph = build_rdf_graph(
                 entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
             )
             processed += 1
 
-            # Check if this nanopub already exists
-            if check_nanopub_existence(np_conf, entity):
-                logger.info(f"Nanopub {processed} already exists, skipping")
-                skipped += 1
-                continue
-
-            # Create nanopub
-            np = nanopub.Nanopub(conf=np_conf, assertion=graph)
+            np = nanopub_generator.create_nanopub(assertion=graph)
             np.sign()
             logger.info(f"Nanopub {processed} signed")
             np_uri = np.metadata.np_uri
             if np_uri is None:
                 raise ValueError("no URI returned by nanpub server.")
 
-            ## modify parent key
-            # check if parent_key has been set
-            old_id = getattr(entity, "id")
-            if parent_key is not None:
-                old_parent_key = getattr(entity, parent_key)
-                # check if a particular entity has a parent_key field
-                if old_parent_key is not None:
-                    if not is_nanopub_id(old_parent_key):
-                        new_parent_key = id_map.get(old_parent_key, None)
-                        if new_parent_key is None:
-                            raise AssertionError("new_parent_key is None.")
-                        setattr(entity, parent_key, new_parent_key)
+            logger.info(f"Nanopub signed: {np_uri} for entity: {peh_uri}")
 
-                id_map[old_id] = np_uri
-
-            # modify entity uri
-            setattr(entity, "id", np_uri)
-            logger.info(f"URI generated: {np_uri} for entity: {old_id}")
+            # create w3id - nanopub pairs
+            identifier_pairs.append((peh_uri, np_uri))
 
             if not dry_run:
                 publication_info = np.publish()
@@ -475,16 +646,19 @@ def main(
 
         # Report summary
         logger.info(
-            f"Nanopub processing complete. Processed: {processed}, "
+            f"Processing complete. Processed: {processed}, "
             f"Published: {published}, Skipped: {skipped}"
         )
 
         if output_path is None:
             output_path = data_path
-        return yaml_dump(yaml_root, target_name, entities, output_path)
+        _ = yaml_dump(yaml_root, target_name, entities, output_path)
+
+        # dump identifier_pairs
+        _ = dump_identifier_pairs(identifier_pairs, "pairs.txt")
 
     except Exception as e:
-        logger.error(f"Error in nanopub processing: {e}")
+        logger.error(f"Error in processing: {e}")
         sys.exit(1)
 
 

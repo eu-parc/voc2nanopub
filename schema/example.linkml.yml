@@ -16,7 +16,7 @@ default_prefix: peh
 
 classes:
   Matrix:
-    class_uri: skos:Concept
+    class_uri: peh:Matrix
     mixins:
       - HasTranslations
     slots:
@@ -26,6 +26,8 @@ classes:
       - parent_matrix
       - sort_order
       - unique_name
+    close_mappings:
+      - skos:Concept
 
   HasTranslations:
     mixin: true
