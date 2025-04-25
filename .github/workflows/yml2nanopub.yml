@@ -40,6 +40,18 @@ on:
         description: 'output path for modified yaml file'
         type: string
         required: false
+      output_pairs:
+        description: 'output path for identifier nanopub pairs'
+        type: string
+        required: false
+      preflabel:
+        description: 'name of field used to create identifier using hash function.'
+        required: true
+        type: string
+      type_prefix:
+        description: 'Default part that is added to identifier following namespace.'
+        required: true
+        type: string
       
     secrets:
       token:
@@ -156,6 +168,9 @@ jobs:
             --output "${{ inputs.output }}" \
             ${{ steps.set-server-flag.outputs.SERVER_FLAG }} \
             ${{ steps.set-dry-run.outputs.DRY_RUN_FLAG }} \
+            --output-pairs "${{ inputs.output_pairs }}" \
+            --preflabel "${{ inputs.preflabel }}" \
+            --type-prefix "${{ inputs.type_prefix }}" \
             --verbose
         env:
           NANOPUB_ORCID_ID: ${{ secrets.NANOPUB_ORCID_ID }}
