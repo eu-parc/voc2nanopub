@@ -27,5 +27,5 @@ jobs:
       NANOPUB_ORCID_ID: ${{ secrets.NANOPUB_ORCID_ID }}
       NANOPUB_NAME: ${{ secrets.NANOPUB_NAME }}
       NANOPUB_PRIVATE_KEY: ${{ secrets.NANOPUB_PRIVATE_KEY }}
-      NANOPUB_PUBLIC_KEY: ${{ secrets.NANOPUB_PUBLIC_KEY }}
+      NANOPUB_PUBLIC_KEY: ${{ secrets.NANOPUB_PUBLIC_KEY }} 
       NANOPUB_INTRO_URI: ${{ secrets.NANOPUB_INTRO_URI }}

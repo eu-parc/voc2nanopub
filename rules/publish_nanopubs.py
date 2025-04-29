@@ -15,7 +15,7 @@ import nanopub
 import nanopub.definitions
 import pathlib
 import rdflib
-
+import re
 
 from collections import defaultdict, deque
 from pathlib import Path
@@ -372,6 +372,48 @@ def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
     return YAMLDumper().dump(root, to_file=file_name)
 
 
+def extract_id(url: str, type_prefix: Optional[str] = None):
+    """Extract the type prefix (MA, UN, etc.) and the ID from a w3id.org URL."""
+    match = re.search(fr'w3id\.org/peh/{type_prefix}-([a-f0-9]+)', url)
+    if match:
+        return match.group(1)
+    return None
+
+
+def generate_htaccess(redirects: List, type_prefix: str):
+    """Generate .htaccess content."""
+    
+    rules = []
+    
+    for source, target in redirects:
+        local_path = extract_id(source, type_prefix)
+        if local_path:
+            rules.append(f"RewriteRule ^{local_path}$ {target} [R=302,L]")
+    
+    return "\n".join(rules)
+
+def update_htaccess(redirects: List, output_file: str, type_prefix: Optional[str]=None):
+    # example header
+    #"""Generate or update an .htaccess file."""
+    #header = """RewriteEngine On
+    #
+    ## PEH redirections
+    ## Format: Local ID to nanopub
+    #"""
+
+    if not redirects:
+        print("No valid redirects found in input file.", file=sys.stderr)
+        sys.exit(1)
+    
+    new_content = generate_htaccess(redirects, type_prefix=type_prefix)
+    
+    with open(output_file, 'w') as f:
+        f.write(new_content)
+    
+    print(f"Successfully wrote .htaccess to {output_file}")
+    print(f"Added {len(redirects)} redirect rules")
+
+
 def dump_identifier_pairs(pairs: List[tuple], file_name: str):
     try:
         with open(file_name, "w") as outfile:
@@ -668,7 +710,7 @@ def main(
         if output_path_pairs is None:
             output_path_pairs = "./pairs.txt"
         output_path_pairs = pathlib.Path(output_path_pairs).resolve()
-        _ = dump_identifier_pairs(identifier_pairs, output_path_pairs)
+        _ = update_htaccess(identifier_pairs, output_path_pairs, type_prefix)
 
     except Exception as e:
         logger.error(f"Error in processing: {e}")
