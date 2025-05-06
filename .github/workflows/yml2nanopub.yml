@@ -201,4 +201,3 @@ jobs:
             git commit -m "Update nanopub IDs in ${{ inputs.data }} [skip ci]"
             git push origin ${{ github.ref }}
           fi
-

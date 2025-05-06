@@ -374,7 +374,7 @@ def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
 
 def extract_id(url: str, type_prefix: Optional[str] = None):
     """Extract the type prefix (MA, UN, etc.) and the ID from a w3id.org URL."""
-    match = re.search(fr'w3id\.org/peh/{type_prefix}-([a-f0-9]+)', url)
+    match = re.search(rf"w3id\.org/peh/{type_prefix}-([a-f0-9]+)", url)
     if match:
         return match.group(1)
     return None
@@ -382,34 +382,37 @@ def extract_id(url: str, type_prefix: Optional[str] = None):
 
 def generate_htaccess(redirects: List, type_prefix: str):
     """Generate .htaccess content."""
-    
+
     rules = []
-    
+
     for source, target in redirects:
         local_path = extract_id(source, type_prefix)
         if local_path:
             rules.append(f"RewriteRule ^{local_path}$ {target} [R=302,L]")
-    
+
     return "\n".join(rules)
 
-def update_htaccess(redirects: List, output_file: str, type_prefix: Optional[str]=None):
+
+def update_htaccess(
+    redirects: List, output_file: str, type_prefix: Optional[str] = None
+):
     # example header
-    #"""Generate or update an .htaccess file."""
-    #header = """RewriteEngine On
+    # """Generate or update an .htaccess file."""
+    # header = """RewriteEngine On
     #
     ## PEH redirections
     ## Format: Local ID to nanopub
-    #"""
+    # """
 
     if not redirects:
         print("No valid redirects found in input file.", file=sys.stderr)
         sys.exit(1)
-    
+
     new_content = generate_htaccess(redirects, type_prefix=type_prefix)
-    
-    with open(output_file, 'w') as f:
+
+    with open(output_file, "w") as f:
         f.write(new_content)
-    
+
     print(f"Successfully wrote .htaccess to {output_file}")
     print(f"Added {len(redirects)} redirect rules")
 
@@ -468,7 +471,7 @@ def build_rdf_graph(
             return g
         else:
             raise AssertionError("Assertion Graph is invalid.")
-    except Exception as e:
+    except Exception as _:
         logger.error("Error converting entity to RDF:", exc_info=True)
         logger.debug("Entity details: %s", entity)
         logger.debug(
@@ -637,19 +640,24 @@ def main(
         entities = process_yaml_root(
             yaml_root, target_name, id_key="id", parent_key=parent_key
         )
+        for entity in entities:
+            # registring ids to prevent collisions
+            current_id = getattr(entity, "id")
+            if id_generator.is_namespace_id(current_id):
+                id_generator.register_id(current_id)
+
         # make namespace mapping for language annotation purposes
         namespace_mapping = get_property_mapping(entities, schema_view, BASE_NAMESPACE)
         if len(namespace_mapping) == 0:
             namespace_mapping = None
         # Process each entity, generate identifier and publish nanopub
         for entity in entities:
-            # create identifier
             current_id = getattr(entity, "id")
             if id_generator.is_namespace_id(current_id):
-                id_generator.register_id(current_id)
                 logger.info(f"Entity {current_id} already exists, skipping")
                 skipped += 1
                 continue
+            # create identifier
             peh_uri = id_generator.generate_id(getattr(entity, preflabel))
 
             ## modify parent key
@@ -677,6 +685,8 @@ def main(
             graph = build_rdf_graph(
                 entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
             )
+            serialized_graph = graph.serialize()
+            logger.info(f"nanopub statement: {serialized_graph}")
             processed += 1
 
             np = nanopub_generator.create_nanopub(assertion=graph)

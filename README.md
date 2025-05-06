@@ -118,21 +118,13 @@ your_entity_list_name:
 After the workflow runs successfully:
 1. Your terms will be published as nanopublications
 2. The data file will be updated with nanopublication IDs (unless in dry-run mode)
-3. If `output_pairs` is specified, a file containing ID-nanopub URI pairs will be created
+3. A file containing .htaccess redirect information will be created.
 
 ## Script Source
 
 The workflow uses the `publish_nanopubs.py` script, which it will:
 1. Try to find in the `./rules/` directory of your repository
 2. Download from the `eu-parc/voc2nanopub` repository if not found locally
-
-## Dependencies
-
-- Python 3.12
-- LinkML
-- nanopub
-- rdflib
-- click
 
 ## License
 
