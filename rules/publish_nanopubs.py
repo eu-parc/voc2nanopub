@@ -16,6 +16,7 @@ import nanopub.definitions
 import pathlib
 import rdflib
 import re
+import requests
 
 from collections import defaultdict, deque
 from pathlib import Path
@@ -155,6 +156,15 @@ class NanopubGenerator:
 
     def create_nanopub(self, assertion: rdflib.Graph) -> nanopub.Nanopub:
         return nanopub.Nanopub(conf=self.np_conf, assertion=assertion)
+
+    def update_nanopub(self, np_uri: str, assertion: rdflib.Graph) -> nanopub.Nanopub:
+        new_np = nanopub.NanopubUpdate(
+            uri=np_uri,
+            conf=self.np_conf,
+            assertion=assertion,
+        )
+        new_np.sign()
+        return new_np
 
     @classmethod
     def is_nanopub_id(cls, key: str):
@@ -374,7 +384,7 @@ def yaml_dump(root: YAMLRoot, target_name: str, entities: List, file_name: str):
 
 def extract_id(url: str, type_prefix: Optional[str] = None):
     """Extract the type prefix (MA, UN, etc.) and the ID from a w3id.org URL."""
-    match = re.search(fr'w3id\.org/peh/{type_prefix}-([a-f0-9]+)', url)
+    match = re.search(rf"w3id\.org/peh/{type_prefix}-([a-f0-9]+)", url)
     if match:
         return match.group(1)
     return None
@@ -382,34 +392,37 @@ def extract_id(url: str, type_prefix: Optional[str] = None):
 
 def generate_htaccess(redirects: List, type_prefix: str):
     """Generate .htaccess content."""
-    
+
     rules = []
-    
+
     for source, target in redirects:
         local_path = extract_id(source, type_prefix)
         if local_path:
             rules.append(f"RewriteRule ^{local_path}$ {target} [R=302,L]")
-    
+
     return "\n".join(rules)
 
-def update_htaccess(redirects: List, output_file: str, type_prefix: Optional[str]=None):
+
+def update_htaccess(
+    redirects: List, output_file: str, type_prefix: Optional[str] = None
+):
     # example header
-    #"""Generate or update an .htaccess file."""
-    #header = """RewriteEngine On
+    # """Generate or update an .htaccess file."""
+    # header = """RewriteEngine On
     #
     ## PEH redirections
     ## Format: Local ID to nanopub
-    #"""
+    # """
 
     if not redirects:
         print("No valid redirects found in input file.", file=sys.stderr)
         sys.exit(1)
-    
+
     new_content = generate_htaccess(redirects, type_prefix=type_prefix)
-    
-    with open(output_file, 'w') as f:
+
+    with open(output_file, "w") as f:
         f.write(new_content)
-    
+
     print(f"Successfully wrote .htaccess to {output_file}")
     print(f"Added {len(redirects)} redirect rules")
 
@@ -468,7 +481,7 @@ def build_rdf_graph(
             return g
         else:
             raise AssertionError("Assertion Graph is invalid.")
-    except Exception as e:
+    except Exception as _:
         logger.error("Error converting entity to RDF:", exc_info=True)
         logger.debug("Entity details: %s", entity)
         logger.debug(
@@ -618,7 +631,7 @@ def main(
         # Count for reporting
         processed = 0
         published = 0
-        skipped = 0
+        updated = 0
 
         nanopub_generator = NanopubGenerator(
             orcid_id=orcid_id,
@@ -637,69 +650,113 @@ def main(
         entities = process_yaml_root(
             yaml_root, target_name, id_key="id", parent_key=parent_key
         )
+        for entity in entities:
+            # registring ids to prevent collisions
+            current_id = getattr(entity, "id")
+            if id_generator.is_namespace_id(current_id):
+                id_generator.register_id(current_id)
+
         # make namespace mapping for language annotation purposes
         namespace_mapping = get_property_mapping(entities, schema_view, BASE_NAMESPACE)
         if len(namespace_mapping) == 0:
             namespace_mapping = None
         # Process each entity, generate identifier and publish nanopub
         for entity in entities:
-            # create identifier
             current_id = getattr(entity, "id")
             if id_generator.is_namespace_id(current_id):
-                id_generator.register_id(current_id)
+                ## Entity is already published as nanopub
                 logger.info(f"Entity {current_id} already exists, skipping")
-                skipped += 1
-                continue
-            peh_uri = id_generator.generate_id(getattr(entity, preflabel))
+                graph = build_rdf_graph(
+                    entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
+                )
+                # Fetch existing nanopub
+                existing_graph = None
+                # Compare new and existing graph
+                if existing_graph != graph:
+                    # use redirect to get nanopub uri
+                    response = requests.get(
+                        current_id, allow_redirects=True, timeout=10
+                    )
+                    if not response.status_code == 200:
+                        logger.error(
+                            f"Voc entry {current_id} could not be redirected for update."
+                        )
+                        continue
+                    current_np_uri = response.url
+                    new_np = nanopub_generator.update_nanopub(current_np_uri, graph)
+                    new_np_uri = new_np.metadata.np_uri
+                    logger.info(
+                        f"Voc entry {current_id} has been updated. Updating Nanopub: {new_np_uri}"
+                    )
 
-            ## modify parent key
-            # check if parent_key has been set
-            old_id = getattr(entity, "id")
-            if parent_key is not None:
-                old_parent_key_value = getattr(entity, parent_key)
-                # check if a particular entity has a parent_key field
-                if old_parent_key_value is not None:
-                    if not id_generator.is_namespace_id(old_parent_key_value):
-                        new_parent_key_value = id_map.get(old_parent_key_value, None)
-                        if new_parent_key_value is None:
-                            raise AssertionError("Parent key was not found in id_map.")
-                        new_parent_key_value_entity = getattr(
-                            entity, parent_key
-                        ).__class__(new_parent_key_value)
-                        setattr(entity, parent_key, new_parent_key_value_entity)
+                    if not dry_run:
+                        publication_info = new_np.publish()
+                        published += 1
+                        logger.info(f"Nanopub update info: {publication_info}")
 
-                id_map[old_id] = peh_uri
+                    # create w3id - nanopub pairs
+                    identifier_pairs.append((current_id, new_np_uri))
+                    updated += 1
 
-            # modify entity uri
-            setattr(entity, "id", peh_uri)
-            logger.info(f"URI generated: {peh_uri} for entity: {old_id}")
+            else:
+                ## Entity has no nanopub yet
+                # create identifier
+                peh_uri = id_generator.generate_id(getattr(entity, preflabel))
 
-            graph = build_rdf_graph(
-                entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
-            )
-            processed += 1
+                ## modify parent key
+                # check if parent_key has been set
+                old_id = getattr(entity, "id")
+                if parent_key is not None:
+                    old_parent_key_value = getattr(entity, parent_key)
+                    # check if a particular entity has a parent_key field
+                    if old_parent_key_value is not None:
+                        if not id_generator.is_namespace_id(old_parent_key_value):
+                            new_parent_key_value = id_map.get(
+                                old_parent_key_value, None
+                            )
+                            if new_parent_key_value is None:
+                                raise AssertionError(
+                                    "Parent key was not found in id_map."
+                                )
+                            new_parent_key_value_entity = getattr(
+                                entity, parent_key
+                            ).__class__(new_parent_key_value)
+                            setattr(entity, parent_key, new_parent_key_value_entity)
 
-            np = nanopub_generator.create_nanopub(assertion=graph)
-            np.sign()
-            logger.info(f"Nanopub {processed} signed")
-            np_uri = np.metadata.np_uri
-            if np_uri is None:
-                raise ValueError("no URI returned by nanpub server.")
+                    id_map[old_id] = peh_uri
 
-            logger.info(f"Nanopub signed: {np_uri} for entity: {peh_uri}")
+                # modify entity uri
+                setattr(entity, "id", peh_uri)
+                logger.info(f"URI generated: {peh_uri} for entity: {old_id}")
 
-            # create w3id - nanopub pairs
-            identifier_pairs.append((peh_uri, np_uri))
+                graph = build_rdf_graph(
+                    entity, schema_view, namespace_mapping, vocab_uri=vocab_uri
+                )
+                serialized_graph = graph.serialize()
+                logger.info(f"nanopub statement: {serialized_graph}")
+                processed += 1
 
-            if not dry_run:
-                publication_info = np.publish()
-                published += 1
-                logger.info(f"Nanopub {processed} published: {publication_info}")
+                np = nanopub_generator.create_nanopub(assertion=graph)
+                np.sign()
+                logger.info(f"Nanopub {processed} signed")
+                np_uri = np.metadata.np_uri
+                if np_uri is None:
+                    raise ValueError("no URI returned by nanpub server.")
+
+                logger.info(f"Nanopub signed: {np_uri} for entity: {peh_uri}")
+
+                if not dry_run:
+                    publication_info = np.publish()
+                    published += 1
+                    logger.info(f"Nanopub {processed} published: {publication_info}")
+
+                # create w3id - nanopub pairs
+                identifier_pairs.append((peh_uri, np_uri))
 
         # Report summary
         logger.info(
             f"Processing complete. Processed: {processed}, "
-            f"Published: {published}, Skipped: {skipped}"
+            f"Published: {published}, Updated: {updated}"
         )
 
         if output_path is None:
